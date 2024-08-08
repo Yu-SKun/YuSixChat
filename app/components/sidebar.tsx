@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useState, Fragment } from "react";
 
 import styles from "./home.module.scss";
 
@@ -10,8 +10,8 @@ import AddIcon from "../icons/add.svg";
 import CloseIcon from "../icons/close.svg";
 import DeleteIcon from "../icons/delete.svg";
 import MaskIcon from "../icons/mask.svg";
-import PluginIcon from "../icons/plugin.svg";
 import DragIcon from "../icons/drag.svg";
+import DiscoveryIcon from "../icons/discovery.svg";
 
 import Locale from "../locales";
 
@@ -23,19 +23,20 @@ import {
   MIN_SIDEBAR_WIDTH,
   NARROW_SIDEBAR_WIDTH,
   Path,
+  PLUGINS,
   REPO_URL,
 } from "../constant";
 
 import { Link, useNavigate } from "react-router-dom";
 import { isIOS, useMobileScreen } from "../utils";
 import dynamic from "next/dynamic";
-import { showConfirm, showToast } from "./ui-lib";
+import { showConfirm, Selector } from "./ui-lib";
 
 const ChatList = dynamic(async () => (await import("./chat-list")).ChatList, {
   loading: () => null,
 });
 
-function useHotKey() {
+export function useHotKey() {
   const chatStore = useChatStore();
 
   useEffect(() => {
@@ -54,7 +55,7 @@ function useHotKey() {
   });
 }
 
-function useDragSideBar() {
+export function useDragSideBar() {
   const limit = (x: number) => Math.min(MAX_SIDEBAR_WIDTH, x);
 
   const config = useAppConfig();
@@ -127,25 +128,21 @@ function useDragSideBar() {
     shouldNarrow,
   };
 }
-
-export function SideBar(props: { className?: string }) {
-  const chatStore = useChatStore();
-
-  // drag side bar
-  const { onDragStart, shouldNarrow } = useDragSideBar();
-  const navigate = useNavigate();
-  const config = useAppConfig();
+export function SideBarContainer(props: {
+  children: React.ReactNode;
+  onDragStart: (e: MouseEvent) => void;
+  shouldNarrow: boolean;
+  className?: string;
+}) {
   const isMobileScreen = useMobileScreen();
   const isIOSMobile = useMemo(
     () => isIOS() && isMobileScreen,
     [isMobileScreen],
   );
-
-  useHotKey();
-
+  const { children, className, onDragStart, shouldNarrow } = props;
   return (
     <div
-      className={`${styles.sidebar} ${props.className} ${
+      className={`${styles.sidebar} ${className} ${
         shouldNarrow && styles["narrow-sidebar"]
       }`}
       style={{
@@ -153,44 +150,130 @@ export function SideBar(props: { className?: string }) {
         transition: isMobileScreen && isIOSMobile ? "none" : undefined,
       }}
     >
-      <div className={styles["sidebar-header"]} data-tauri-drag-region>
-        <div className={styles["sidebar-title"]} data-tauri-drag-region>
-        Timo Chat
-        </div>
-        <div className={styles["sidebar-sub-title"]}>
-          Chat with your AI assistant.
-        </div>
-        <div className={styles["sidebar-logo"] + " no-dark"}>
-          {/* <ChatGptIcon /> */}
-          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="48" height="48"><path d="M512 910.234c-92.774 0-178.995-24.27-250.88-65.946L115.2 891.392c-6.349 2.048-13.312 1.843-19.558-.717-14.541-5.939-21.504-22.528-15.565-37.069l50.79-123.801C84.07 667.136 56.934 592.384 56.934 512c0-219.955 203.776-398.234 455.066-398.234S967.066 292.045 967.066 512 763.392 910.234 512 910.234zm0-341.3c31.437 0 56.934-25.497 56.934-56.934 0-31.437-25.497-56.934-56.934-56.934S455.066 480.563 455.066 512s25.497 56.934 56.934 56.934zm-227.533 0c31.437 0 56.935-25.497 56.935-56.934 0-31.437-25.498-56.934-56.935-56.934S227.533 480.563 227.533 512c0 31.437 25.497 56.934 56.934 56.934zm455.066 0c31.437 0 56.934-25.497 56.934-56.934 0-31.437-25.497-56.934-56.934-56.934-31.437 0-56.935 25.497-56.935 56.934.103 31.437 25.498 56.934 56.935 56.934z" fill="#8BCAE0"></path></svg>
-        </div>
-      </div>
-
-      <div className={styles["sidebar-header-bar"]}>
-        <IconButton
-          icon={<MaskIcon />}
-          text={shouldNarrow ? undefined : Locale.Mask.Name}
-          className={styles["sidebar-bar-button"]}
-          onClick={() => {
-            if (config.dontShowMaskSplashScreen !== true) {
-              navigate(Path.NewChat, { state: { fromHome: true } });
-            } else {
-              navigate(Path.Masks, { state: { fromHome: true } });
-            }
-          }}
-          shadow
-        />
-        <IconButton
-          icon={<PluginIcon />}
-          text={shouldNarrow ? undefined : Locale.Plugin.Name}
-          className={styles["sidebar-bar-button"]}
-          onClick={() => showToast(Locale.WIP)}
-          shadow
-        />
-      </div>
-
+      {children}
       <div
-        className={styles["sidebar-body"]}
+        className={styles["sidebar-drag"]}
+        onPointerDown={(e) => onDragStart(e as any)}
+      >
+        <DragIcon />
+      </div>
+    </div>
+  );
+}
+
+export function SideBarHeader(props: {
+  title?: string | React.ReactNode;
+  subTitle?: string | React.ReactNode;
+  logo?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const { title, subTitle, logo, children } = props;
+  return (
+    <Fragment>
+      <div className={styles["sidebar-header"]} data-tauri-drag-region>
+        <div className={styles["sidebar-title-container"]}>
+          <div className={styles["sidebar-title"]} data-tauri-drag-region>
+            {title}
+          </div>
+          <div className={styles["sidebar-sub-title"]}>{subTitle}</div>
+        </div>
+        <div className={styles["sidebar-logo"] + " no-dark"}>{logo}</div>
+      </div>
+      {children}
+    </Fragment>
+  );
+}
+
+export function SideBarBody(props: {
+  children: React.ReactNode;
+  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void;
+}) {
+  const { onClick, children } = props;
+  return (
+    <div className={styles["sidebar-body"]} onClick={onClick}>
+      {children}
+    </div>
+  );
+}
+
+export function SideBarTail(props: {
+  primaryAction?: React.ReactNode;
+  secondaryAction?: React.ReactNode;
+}) {
+  const { primaryAction, secondaryAction } = props;
+
+  return (
+    <div className={styles["sidebar-tail"]}>
+      <div className={styles["sidebar-actions"]}>{primaryAction}</div>
+      <div className={styles["sidebar-actions"]}>{secondaryAction}</div>
+    </div>
+  );
+}
+
+export function SideBar(props: { className?: string }) {
+  useHotKey();
+  const { onDragStart, shouldNarrow } = useDragSideBar();
+  const [showPluginSelector, setShowPluginSelector] = useState(false);
+  const navigate = useNavigate();
+  const config = useAppConfig();
+  const chatStore = useChatStore();
+
+  return (
+    <SideBarContainer
+      onDragStart={onDragStart}
+      shouldNarrow={shouldNarrow}
+      {...props}
+    >
+      <SideBarHeader
+        title="NextChat"
+        subTitle="Build your own AI assistant."
+        logo={<ChatGptIcon />}
+      >
+        <div className={styles["sidebar-header-bar"]}>
+          <IconButton
+            icon={<MaskIcon />}
+            text={shouldNarrow ? undefined : Locale.Mask.Name}
+            className={styles["sidebar-bar-button"]}
+            onClick={() => {
+              if (config.dontShowMaskSplashScreen !== true) {
+                navigate(Path.NewChat, { state: { fromHome: true } });
+              } else {
+                navigate(Path.Masks, { state: { fromHome: true } });
+              }
+            }}
+            shadow
+          />
+          <IconButton
+            icon={<DiscoveryIcon />}
+            text={shouldNarrow ? undefined : Locale.Discovery.Name}
+            className={styles["sidebar-bar-button"]}
+            onClick={() => setShowPluginSelector(true)}
+            shadow
+          />
+        </div>
+        {showPluginSelector && (
+          <Selector
+            items={[
+              {
+                title: "👇 Please select the plugin you need to use",
+                value: "-",
+                disable: true,
+              },
+              ...PLUGINS.map((item) => {
+                return {
+                  title: item.name,
+                  value: item.path,
+                };
+              }),
+            ]}
+            onClose={() => setShowPluginSelector(false)}
+            onSelection={(s) => {
+              navigate(s[0], { state: { fromHome: true } });
+            }}
+          />
+        )}
+      </SideBarHeader>
+      <SideBarBody
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             navigate(Path.Home);
@@ -198,27 +281,32 @@ export function SideBar(props: { className?: string }) {
         }}
       >
         <ChatList narrow={shouldNarrow} />
-      </div>
-
-      <div className={styles["sidebar-tail"]}>
-        <div className={styles["sidebar-actions"]}>
-          <div className={styles["sidebar-action"] + " " + styles.mobile}>
-            <IconButton
-              icon={<DeleteIcon />}
-              onClick={async () => {
-                if (await showConfirm(Locale.Home.DeleteChat)) {
-                  chatStore.deleteSession(chatStore.currentSessionIndex);
-                }
-              }}
-            />
-          </div>
-          <div className={styles["sidebar-action"]}>
-            <Link to={Path.Settings}>
-              <IconButton icon={<SettingsIcon />} shadow />
-            </Link>
-          </div> 
-        </div>
-        <div>
+      </SideBarBody>
+      <SideBarTail
+        primaryAction={
+          <>
+            <div className={styles["sidebar-action"] + " " + styles.mobile}>
+              <IconButton
+                icon={<DeleteIcon />}
+                onClick={async () => {
+                  if (await showConfirm(Locale.Home.DeleteChat)) {
+                    chatStore.deleteSession(chatStore.currentSessionIndex);
+                  }
+                }}
+              />
+            </div>
+            <div className={styles["sidebar-action"]}>
+              <Link to={Path.Settings}>
+                <IconButton
+                  aria={Locale.Settings.Title}
+                  icon={<SettingsIcon />}
+                  shadow
+                />
+              </Link>
+            </div>
+          </>
+        }
+        secondaryAction={
           <IconButton
             icon={<AddIcon />}
             text={shouldNarrow ? undefined : Locale.Home.NewChat}
@@ -232,15 +320,8 @@ export function SideBar(props: { className?: string }) {
             }}
             shadow
           />
-        </div>
-      </div>
-
-      <div
-        className={styles["sidebar-drag"]}
-        onPointerDown={(e) => onDragStart(e as any)}
-      >
-        <DragIcon />
-      </div>
-    </div>
+        }
+      />
+    </SideBarContainer>
   );
 }
